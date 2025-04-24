@@ -1,54 +1,60 @@
 const express = require('express');
-const bodyParser = require('body-parser');
-const axios = require('axios');
-require('dotenv').config();
-
+const cors = require('cors');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-app.use(bodyParser.json());
+app.use(cors());
+app.use(express.json());
 
-app.get('/', (req, res) => {
-  res.send('Servidor Ativo – Webhook Lumieregyn + SURI');
-});
+app.post('/conversa', (req, res) => {
+  const { cliente, vendedor, checklist } = req.body;
 
-app.post('/conversa', async (req, res) => {
-  try {
-    const dados = req.body;
-    const { cliente, vendedor, checklist, alertas } = dados;
-
-    let texto = `🚨 *Alerta de Atendimento Incompleto* 🚨\n\n`;
-    texto += `👤 *Cliente:* ${cliente}\n👩‍💼 *Vendedor:* ${vendedor}\n\n`;
-
-    alertas.forEach((a) => {
-      texto += `⚠️ ${a}\n`;
-    });
-
-    texto += `\n👉 Por favor, revise os pontos pendentes antes de fechar o pedido.`;
-
-    const resposta = await axios.post('https://v3.suri.ai/message/send-text', {
-      number: '554731703288',
-      text: texto
-    }, {
-      headers: {
-        Authorization: `Bearer ${process.env.SURI_TOKEN}`
-      }
-    });
-
-    return res.json({
-      status: 'ok',
-      enviado_para_suri: true,
-      retorno_suri: resposta.data
-    });
-
-  } catch (error) {
-    console.error('Erro ao processar conversa ou enviar para SURI:', error.response?.data || error.message);
-    return res.status(500).json({
+  // Validação básica
+  if (!cliente || !vendedor || typeof checklist !== 'object') {
+    return res.status(400).json({
       status: 'erro',
-      erro: error.message,
-      detalhes: error.response?.data || null
+      erro: 'Dados ausentes ou inválidos. Certifique-se de enviar cliente, vendedor e checklist corretamente.'
     });
   }
+
+  const camposObrigatorios = [
+    'produto',
+    'cor',
+    'medidas',
+    'quantidade',
+    'tensao',
+    'prazo',
+    'resumo'
+  ];
+
+  const alertas = [];
+  const confirmacoes = {};
+
+  camposObrigatorios.forEach(campo => {
+    const confirmado = checklist[campo] === true;
+    confirmacoes[campo] = confirmado;
+
+    if (!confirmado) {
+      alertas.push(`⚠️ Falta confirmar: ${campo}`);
+    }
+  });
+
+  const statusAtendimento = alertas.length > 0 ? 'incompleto' : 'completo';
+
+  const resposta = {
+    cliente,
+    vendedor,
+    checklist: confirmacoes,
+    status: statusAtendimento,
+    alertas,
+    sugestao: alertas.length > 0
+      ? 'Recomenda-se validar os pontos pendentes antes de seguir com o pedido.'
+      : 'Atendimento completo. Pronto para formalizar o pedido.'
+  };
+
+  // Aqui entraria o envio para SURI futuramente (alerta automático via WhatsApp)
+
+  return res.status(200).json(resposta);
 });
 
 app.listen(PORT, () => {
