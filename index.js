@@ -5,8 +5,15 @@ const analiseRoute = require('./routes/analise');
 
 app.use(cors());
 app.use(express.json());
-app.get('/', (req, res) => res.json({ status: "ok", mensagem: "Servidor webhook ativo para análise de conversas." }));
+
+// Health check endpoint
+debugger;
+app.get('/', (req, res) => {
+  res.json({ status: 'ok', mensagem: 'Servidor webhook ativo para análise de conversas.' });
+});
+
+// Rota de análise de conversas
 app.use('/conversa', analiseRoute);
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Servidor rodando na porta ${PORT}`));
+app.listen(PORT, () => console.log(`🚀 Servidor rodando na porta ${PORT}`));
