@@ -1,42 +1,30 @@
-// backend-crm/index.js
+app.post('/conversa', async (req, res) => {
+  const { cliente, vendedor, mensagem } = req.body;
 
-const express = require('express');
-const cors = require('cors');
-const app = express();
-const PORT = process.env.PORT || 10000;
-
-// Middlewares compatíveis com todos os tipos de body
-app.use(cors());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-
-// Armazenar logs de requisições webhook
-let logs = [];
-
-// Health check
-app.get('/', (req, res) => {
-  res.status(200).send('Servidor ativo!');
-});
-
-// Webhook principal
-app.post('/webhook', (req, res) => {
-  const log = {
-    timestamp: new Date().toISOString(),
-    headers: req.headers,
-    body: req.body
+  const checklist = {
+    produto: /produto|modelo|lumin[aá]ria/i.test(mensagem),
+    cor: /cor|dourado|preto|branco|cobre/i.test(mensagem),
+    medidas: /medida|cm|tamanho|dimens[aã]o/i.test(mensagem),
+    quantidade: /quantidade|unidade|peca|peça/i.test(mensagem),
+    tensao: /bivolt|110|220|voltagem|tens[aã]o/i.test(mensagem),
+    prazo: /prazo|entrega|dias [uú]teis/i.test(mensagem),
+    resumo: /resumo|confirmar|finalizar|confer[aê]ncia/i.test(mensagem)
   };
 
-  logs.push(log);
-  console.log('📡 Webhook recebido:', log);
+  const alertas = Object.entries(checklist)
+    .filter(([_, confirmado]) => !confirmado)
+    .map(([campo]) => `⚠️ Falta confirmar: ${campo}`);
 
-  res.status(200).json({ status: 'ok' });
-});
+  const resposta = {
+    cliente,
+    vendedor,
+    checklist,
+    status: alertas.length === 0 ? "completo" : "incompleto",
+    alertas,
+    sugestao: alertas.length > 0
+      ? "Recomenda-se validar os pontos pendentes antes de seguir com o pedido."
+      : "Todos os pontos foram confirmados, pronto para prosseguir."
+  };
 
-// Logs visíveis pela web
-app.get('/logs', (req, res) => {
-  res.json(logs.slice(-10));
-});
-
-app.listen(PORT, () => {
-  console.log(`🚀 Backend CRM rodando na porta ${PORT}`);
+  res.json(resposta);
 });
