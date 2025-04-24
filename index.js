@@ -1,14 +1,20 @@
-
 const express = require('express');
 const cors = require('cors');
-const app = express();
+const bodyParser = require('body-parser');
 const analiseRoute = require('./routes/analise');
 
-app.use(cors());
-app.use(express.json());
-app.use('/', analiseRoute);
-
+const app = express();
 const PORT = process.env.PORT || 3000;
+
+app.use(cors());
+app.use(bodyParser.json());
+
+app.get('/', (req, res) => {
+    res.json({ status: 'ok', mensagem: 'Servidor webhook ativo para análise de conversas.' });
+});
+
+app.use('/conversa', analiseRoute);
+
 app.listen(PORT, () => {
-  console.log(`Servidor rodando na porta ${PORT}`);
+    console.log(`Servidor rodando na porta ${PORT}`);
 });
