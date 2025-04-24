@@ -1,7 +1,6 @@
 {
   "name": "webhook-suri-agent",
   "version": "1.0.0",
-  "description": "Agente Supervisor de Conversas - Versão Simples",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
