@@ -1,67 +1,56 @@
 const express = require('express');
-const fs = require('fs');
+const bodyParser = require('body-parser');
+const axios = require('axios');
+require('dotenv').config();
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-app.use(express.json());
+app.use(bodyParser.json());
 
-// Rota principal (verificação de saúde)
 app.get('/', (req, res) => {
-  res.send('Servidor Webhook Lumieregyn está ativo!');
+  res.send('Servidor Ativo – Webhook Lumieregyn + SURI');
 });
 
-// Rota de webhook da SURI
-app.post('/webhook', (req, res) => {
-  const data = req.body;
-  const log = `[${new Date().toISOString()}] Webhook recebido: ${JSON.stringify(data)}\n`;
-  fs.appendFileSync('logs.txt', log);
-  res.sendStatus(200);
-});
+app.post('/conversa', async (req, res) => {
+  try {
+    const dados = req.body;
+    const { cliente, vendedor, checklist, alertas } = dados;
 
-// Rota para visualizar os logs
-app.get('/logs', (req, res) => {
-  if (fs.existsSync('logs.txt')) {
-    const logs = fs.readFileSync('logs.txt', 'utf8');
-    res.setHeader('Content-Type', 'text/plain');
-    res.send(logs);
-  } else {
-    res.send('Nenhum log registrado ainda.');
+    let texto = `🚨 *Alerta de Atendimento Incompleto* 🚨\n\n`;
+    texto += `👤 *Cliente:* ${cliente}\n👩‍💼 *Vendedor:* ${vendedor}\n\n`;
+
+    alertas.forEach((a) => {
+      texto += `⚠️ ${a}\n`;
+    });
+
+    texto += `\n👉 Por favor, revise os pontos pendentes antes de fechar o pedido.`;
+
+    const resposta = await axios.post('https://v3.suri.ai/message/send-text', {
+      number: '554731703288',
+      text: texto
+    }, {
+      headers: {
+        Authorization: `Bearer ${process.env.SURI_TOKEN}`
+      }
+    });
+
+    return res.json({
+      status: 'ok',
+      enviado_para_suri: true,
+      retorno_suri: resposta.data
+    });
+
+  } catch (error) {
+    console.error('Erro ao processar conversa ou enviar para SURI:', error.response?.data || error.message);
+    return res.status(500).json({
+      status: 'erro',
+      erro: error.message,
+      detalhes: error.response?.data || null
+    });
   }
 });
 
-// NOVA ROTA: análise de conversa com IA (Versão 1.0)
-app.post('/conversa', async (req, res) => {
-  const { cliente, vendedor, mensagem } = req.body;
-
-  const checklist = {
-    produto: /produto|modelo|lumin[aá]ria/i.test(mensagem),
-    cor: /cor|dourado|preto|branco|cobre/i.test(mensagem),
-    medidas: /medida|cm|tamanho|dimens[aã]o/i.test(mensagem),
-    quantidade: /quantidade|unidade|peca|peça/i.test(mensagem),
-    tensao: /bivolt|110|220|voltagem|tens[aã]o/i.test(mensagem),
-    prazo: /prazo|entrega|dias [uú]teis/i.test(mensagem),
-    resumo: /resumo|confirmar|finalizar|confer[aê]ncia/i.test(mensagem)
-  };
-
-  const alertas = Object.entries(checklist)
-    .filter(([_, confirmado]) => !confirmado)
-    .map(([campo]) => `⚠️ Falta confirmar: ${campo}`);
-
-  const resposta = {
-    cliente,
-    vendedor,
-    checklist,
-    status: alertas.length === 0 ? "completo" : "incompleto",
-    alertas,
-    sugestao: alertas.length > 0
-      ? "Recomenda-se validar os pontos pendentes antes de seguir com o pedido."
-      : "Todos os pontos foram confirmados, pronto para prosseguir."
-  };
-
-  res.json(resposta);
-});
-
-// Inicialização do servidor
 app.listen(PORT, () => {
-  console.log(`Servidor ativo na porta ${PORT}`);
+  console.log(`Servidor rodando na porta ${PORT}`);
 });
